@@ -1,0 +1,51 @@
+- name: Deploy Frontend App (simple mode)
+  hosts: frontend
+  become: yes
+
+  vars:
+    app_image: "{{ app_image }}"
+    back_host: "{{ back_host }}"
+
+  tasks:
+
+    - name: Update APT
+      apt:
+        update_cache: yes
+
+    - name: Install Docker and tools
+      apt:
+        name:
+          - docker.io
+          - curl
+          - jq
+          - ca-certificates
+        state: present
+
+    - name: Ensure Docker service is running
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Stop existing frontend container
+      shell: docker stop frontend || true
+
+    - name: Remove old container
+      shell: docker rm frontend || true
+
+    - name: Run frontend container
+      shell: |
+        docker run -d --name frontend --restart=always -p 3030:3030 \
+          -e NODE_ENV=production \
+          -e PORT=3030 \
+          -e BACK_HOST="{{ back_host }}" \
+          "{{ app_image }}"
+
+    - name: Healthcheck
+      uri:
+        url: "http://localhost:3030"
+        status_code: 200
+      register: health
+      retries: 10
+      delay: 4
+      until: health.status == 200
