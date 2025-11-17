@@ -1,0 +1,112 @@
+- name: Backend Bootstrap (Prepare API server for Docker deployments)
+  hosts: backend
+  become: yes
+
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+    DB_HOST: "{{ db_host }}"
+    DB_USER: "{{ db_user | default('usuario') }}"
+    DB_PASS: "{{ db_pass | default('usuario') }}"
+    DB_NAME: "{{ db_name | default('movie_db') }}"
+
+  tasks:
+
+    # --- Prevent dpkg locks ----------------------------------------------------
+    - name: Wait for dpkg lock
+      shell: |
+        while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          echo "Waiting for dpkg lock..."
+          sleep 5
+        done
+      changed_when: false
+
+    # --- Basic Packages --------------------------------------------------------
+    - name: Install base tools
+      apt:
+        name:
+          - curl
+          - jq
+          - ca-certificates
+        state: present
+        update_cache: yes
+
+    # --- SSM Agent -------------------------------------------------------------
+    - name: Check if SSM Agent installed
+      command: which amazon-ssm-agent
+      register: ssm_check
+      ignore_errors: yes
+
+    - name: Install SSM Agent via snap if missing
+      snap:
+        name: amazon-ssm-agent
+        classic: yes
+        state: present
+      when: ssm_check.rc != 0
+      ignore_errors: yes
+
+    - name: Install SSM Agent via apt as fallback
+      apt:
+        name: amazon-ssm-agent
+        state: present
+      when: ssm_check.rc != 0
+      ignore_errors: yes
+
+    - name: Ensure SSM Agent enabled and started
+      service:
+        name: amazon-ssm-agent
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    # --- Docker ----------------------------------------------------------------
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Ensure Docker running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ubuntu to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    # --- Check Docker and SSM --------------------------------------------------
+    - name: Docker version
+      command: docker --version
+      ignore_errors: yes
+
+    - name: SSM Agent version
+      command: amazon-ssm-agent -version
+      ignore_errors: yes
+
+    # --- Write ENV configuration -----------------------------------------------
+    - name: Ensure config directory exists
+      file:
+        path: /etc/movie-analyst
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Write API environment file
+      copy:
+        dest: /etc/movie-analyst/.env
+        mode: '0644'
+        content: |
+          DB_HOST={{ DB_HOST }}
+          DB_USER={{ DB_USER }}
+          DB_PASS={{ DB_PASS }}
+          DB_NAME={{ DB_NAME }}
+
+    - name: Persist DB_HOST in /etc/environment
+      lineinfile:
+        path: /etc/environment
+        regexp: "^DB_HOST="
+        line: "DB_HOST={{ DB_HOST }}"
+        state: present
