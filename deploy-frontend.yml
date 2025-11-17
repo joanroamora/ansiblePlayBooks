@@ -8,6 +8,13 @@
     back_host: "{{ back_host }}"
 
   tasks:
+    - name: Wait for dpkg lock (Ubuntu unattended upgrades)
+      shell: |
+        while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          echo "Waiting for dpkg lock..."
+          sleep 5
+        done
+      changed_when: false
 
     - name: Update APT
       apt:
@@ -18,7 +25,7 @@
         name: amazon-ssm-agent
         state: started
         enabled: yes
-        ignore_errors: yes
+      ignore_errors: yes
 
     - name: Install Docker and tools
       apt:
