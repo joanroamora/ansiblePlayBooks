@@ -12,6 +12,17 @@
       apt:
         update_cache: yes
 
+    - name: Install SSM Agent
+      apt:
+        name: amazon-ssm-agent
+        state: present
+
+    - name: Enable & Start SSM Agent
+      systemd:
+        name: amazon-ssm-agent
+        enabled: yes
+        state: started
+
     - name: Install Docker and tools
       apt:
         name:
@@ -21,7 +32,13 @@
           - ca-certificates
         state: present
 
-    - name: Ensure Docker service is running
+    - name: Ensure Ubuntu user is in Docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Ensure Docker is running
       systemd:
         name: docker
         enabled: yes
