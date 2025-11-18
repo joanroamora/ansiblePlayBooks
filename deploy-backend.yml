@@ -1,9 +1,10 @@
-- name: Backend Bootstrap (Prepare API server for Docker deployments)
+- name: Backend Bootstrap and Deployment
   hosts: backend
   become: yes
 
   vars:
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+    APP_IMAGE: "{{ app_image }}"
     DB_HOST: "{{ db_host }}"
     DB_USER: "{{ db_user | default('usuario') }}"
     DB_PASS: "{{ db_pass | default('usuario') }}"
@@ -76,37 +77,57 @@
         groups: docker
         append: yes
 
-    # --- Check Docker and SSM --------------------------------------------------
-    - name: Docker version
-      command: docker --version
-      ignore_errors: yes
-
-    - name: SSM Agent version
-      command: amazon-ssm-agent -version
-      ignore_errors: yes
-
-    # --- Write ENV configuration -----------------------------------------------
+    # --- Write ENV file --------------------------------------------------------
     - name: Ensure config directory exists
       file:
         path: /etc/movie-analyst
         state: directory
         owner: root
         group: root
-        mode: '0755'
+        mode: "0755"
 
     - name: Write API environment file
       copy:
         dest: /etc/movie-analyst/.env
-        mode: '0644'
+        mode: "0644"
         content: |
           DB_HOST={{ DB_HOST }}
           DB_USER={{ DB_USER }}
           DB_PASS={{ DB_PASS }}
           DB_NAME={{ DB_NAME }}
 
+    # --- Update /etc/environment ----------------------------------------------
     - name: Persist DB_HOST in /etc/environment
       lineinfile:
         path: /etc/environment
         regexp: "^DB_HOST="
         line: "DB_HOST={{ DB_HOST }}"
         state: present
+
+    # --- Pull & Run Backend Container -----------------------------------------
+    - name: Stop existing backend container
+      command: docker stop backend
+      ignore_errors: yes
+
+    - name: Remove existing backend container
+      command: docker rm backend
+      ignore_errors: yes
+
+    - name: Pull latest backend image
+      command: docker pull {{ APP_IMAGE }}
+
+    - name: Run backend container
+      command: >
+        docker run -d --name backend --restart=always
+        -p 3000:3000
+        --env-file /etc/movie-analyst/.env
+        {{ APP_IMAGE }}
+
+    # --- Diagnostics -----------------------------------------------------------
+    - name: Show containers
+      command: docker ps -a
+      ignore_errors: yes
+
+    - name: Show backend logs
+      command: docker logs --tail 50 backend
+      ignore_errors: yes
