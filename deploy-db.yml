@@ -5,41 +5,39 @@
   vars:
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
 
+    # Variables externas desde GitHub Actions
     DB_NAME: "{{ db_name | default('movie_db') }}"
     DB_USER: "{{ db_user | default('usuario') }}"
     DB_PASS: "{{ db_pass | default('usuario') }}"
 
   tasks:
-
     # -------------------------------------------------------------------------
     # Prevent dpkg lock
     # -------------------------------------------------------------------------
-    - name: Wait for dpkg lock (with 10-minute heartbeat)
+    - name: Wait for dpkg lock (10 min timeout)
       shell: |
         echo "Waiting for dpkg/apt locks..."
         start=$(date +%s)
-    
+
         while sudo lsof /var/lib/dpkg/lock >/dev/null 2>&1 \
            || sudo lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
            || sudo lsof /var/lib/apt/lists/lock >/dev/null 2>&1 \
            || sudo lsof /var/cache/apt/archives/lock >/dev/null 2>&1; do
-          
+
           now=$(date +%s)
           elapsed=$(( now - start ))
-    
+
           echo "Still locked... elapsed ${elapsed}s"
           sleep 5
-    
-          # TIMEOUT preventivo: 600s = 10 minutos
+
           if [ $elapsed -gt 600 ]; then
             echo "ERROR: dpkg lock timeout (10 minutes) — aborting."
             exit 1
           fi
         done
-    
+
         echo "dpkg/apt lock released."
       changed_when: false
-
 
     # -------------------------------------------------------------------------
     # System update
@@ -50,7 +48,7 @@
         upgrade: yes
 
     # -------------------------------------------------------------------------
-    # Install MySQL
+    # Install MySQL Server
     # -------------------------------------------------------------------------
     - name: Install MySQL Server
       apt:
@@ -73,22 +71,25 @@
         line: 'bind-address = 0.0.0.0'
       notify: Restart mysql
 
-    # --- Python deps required by mysql_user & mysql_db ---
-    - name: Install Python MySQL dependencies (PyMySQL)
+    # -------------------------------------------------------------------------
+    # Python dependencies for Ansible mysql modules
+    # -------------------------------------------------------------------------
+    - name: Install Python MySQL deps (pip)
       apt:
         name:
           - python3-pip
         state: present
         update_cache: yes
-    
-    - name: Install PyMySQL via pip
+
+    - name: Install PyMySQL
       pip:
         name: PyMySQL
         executable: pip3
+
     # -------------------------------------------------------------------------
-    # Create DB user
+    # Create application user
     # -------------------------------------------------------------------------
-    - name: Create database user
+    - name: Create application DB user
       mysql_user:
         name: "{{ DB_USER }}"
         password: "{{ DB_PASS }}"
@@ -97,30 +98,33 @@
         state: present
 
     # -------------------------------------------------------------------------
-    # Create database
+    # Create main database
     # -------------------------------------------------------------------------
-    - name: Create database
+    - name: Create movie_db database
       mysql_db:
         name: "{{ DB_NAME }}"
         state: present
 
     # -------------------------------------------------------------------------
-    # Clone API repo to get SQL file
+    # Clone repo to access SQL file
     # -------------------------------------------------------------------------
-    - name: Clone API repo for SQL files
+    - name: Clone API repo (SQL schema)
       git:
         repo: "https://github.com/joanroamora/movie-analyst-api.git"
         dest: /home/ubuntu/movie-analyst-api
         version: main
 
     # -------------------------------------------------------------------------
-    # Load SQL schema
+    # Import SQL schema + inserts
     # -------------------------------------------------------------------------
-    - name: Load initial SQL schema & inserts
+    - name: Load SQL schema & inserts
       mysql_db:
         state: import
         name: "{{ DB_NAME }}"
         target: "/home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql"
+        login_user: "{{ DB_USER }}"
+        login_password: "{{ DB_PASS }}"
+        login_host: "127.0.0.1"
 
   handlers:
     - name: Restart mysql
