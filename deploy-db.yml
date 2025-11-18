@@ -11,45 +11,31 @@
 
   tasks:
 
-    # -------------------------------------------------------------------------
-    # Prevent dpkg lock
-    # -------------------------------------------------------------------------
     - name: Wait for dpkg lock (10 min timeout)
       shell: |
         echo "Waiting for dpkg/apt locks..."
         start=$(date +%s)
-
         while sudo lsof /var/lib/dpkg/lock >/dev/null 2>&1 \
            || sudo lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
            || sudo lsof /var/lib/apt/lists/lock >/dev/null 2>&1 \
            || sudo lsof /var/cache/apt/archives/lock >/dev/null 2>&1; do
-
           now=$(date +%s)
           elapsed=$(( now - start ))
-
           echo "Still locked... elapsed ${elapsed}s"
           sleep 5
-
           if [ $elapsed -gt 600 ]; then
-            echo "ERROR: dpkg lock timeout (10 minutes) — aborting."
+            echo "ERROR: dpkg lock timeout (10 minutes)"
             exit 1
           fi
         done
-
         echo "dpkg/apt lock released."
       changed_when: false
 
-    # -------------------------------------------------------------------------
-    # System update
-    # -------------------------------------------------------------------------
     - name: Update apt packages
       apt:
         update_cache: yes
         upgrade: yes
 
-    # -------------------------------------------------------------------------
-    # MySQL installation
-    # -------------------------------------------------------------------------
     - name: Install MySQL Server
       apt:
         name: mysql-server
@@ -61,9 +47,6 @@
         state: started
         enabled: yes
 
-    # -------------------------------------------------------------------------
-    # Allow remote access
-    # -------------------------------------------------------------------------
     - name: Allow external connections
       lineinfile:
         path: /etc/mysql/mysql.conf.d/mysqld.cnf
@@ -71,15 +54,12 @@
         line: 'bind-address = 0.0.0.0'
       notify: Restart mysql
 
-    # -------------------------------------------------------------------------
-    # Bootstrap database using original user-data logic
-    # -------------------------------------------------------------------------
-    - name: Bootstrap DB (users + schema) — same behavior as old user-data script
+    - name: Bootstrap DB (users + schema)
       shell: |
         set -e
 
         echo ">>> Creating remote user {{ DB_USER }}"
-        mysql <<EOF
+        mysql << 'EOF'
 CREATE USER IF NOT EXISTS '{{ DB_USER }}'@'%' IDENTIFIED BY '{{ DB_PASS }}';
 GRANT ALL PRIVILEGES ON *.* TO '{{ DB_USER }}'@'%' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
