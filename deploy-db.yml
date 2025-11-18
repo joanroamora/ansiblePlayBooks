@@ -4,35 +4,52 @@
 
   vars:
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
-    DB_NAME: "{{ db_name | default('movie_db') }}"
-    DB_USER: "{{ db_user | default('usuario') }}"
-    DB_PASS: "{{ db_pass | default('usuario') }}"
+
+    # Si vienen vacíos desde --extra-vars, forzamos defaults del script original
+    DB_NAME: "{{ (db_name  | default('') ) or 'movie_db' }}"
+    DB_USER: "{{ (db_user  | default('') ) or 'usuario' }}"
+    DB_PASS: "{{ (db_pass  | default('') ) or 'usuario' }}"
 
   tasks:
-
+    # -------------------------------------------------------------------------
+    # Prevent dpkg lock (igual idea que antes)
+    # -------------------------------------------------------------------------
     - name: Wait for dpkg lock (10 min timeout)
       shell: |
         echo "Waiting for dpkg/apt locks..."
         start=$(date +%s)
+
         while sudo lsof /var/lib/dpkg/lock >/dev/null 2>&1 \
            || sudo lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
            || sudo lsof /var/lib/apt/lists/lock >/dev/null 2>&1 \
            || sudo lsof /var/cache/apt/archives/lock >/dev/null 2>&1; do
+
           now=$(date +%s)
           elapsed=$(( now - start ))
+
           echo "Still locked... elapsed ${elapsed}s"
           sleep 5
+
           if [ $elapsed -gt 600 ]; then
-            echo "ERROR: dpkg lock timeout"; exit 1
+            echo "ERROR: dpkg lock timeout (10 minutes) — aborting."
+            exit 1
           fi
         done
+
+        echo "dpkg/apt lock released."
       changed_when: false
 
+    # -------------------------------------------------------------------------
+    # System update
+    # -------------------------------------------------------------------------
     - name: Update apt packages
       apt:
         update_cache: yes
         upgrade: yes
 
+    # -------------------------------------------------------------------------
+    # MySQL installation
+    # -------------------------------------------------------------------------
     - name: Install MySQL Server
       apt:
         name: mysql-server
@@ -44,6 +61,9 @@
         state: started
         enabled: yes
 
+    # -------------------------------------------------------------------------
+    # Allow remote access
+    # -------------------------------------------------------------------------
     - name: Allow external connections
       lineinfile:
         path: /etc/mysql/mysql.conf.d/mysqld.cnf
@@ -51,18 +71,26 @@
         line: 'bind-address = 0.0.0.0'
       notify: Restart mysql
 
+    # -------------------------------------------------------------------------
+    # Bootstrap DB usando la lógica original del user-data
+    # -------------------------------------------------------------------------
     - name: Bootstrap DB using user-data logic
       shell: |
         set -e
 
-        mysql << 'EOF'
-        CREATE USER IF NOT EXISTS '{{ DB_USER }}'@'%' IDENTIFIED BY '{{ DB_PASS }}';
-        GRANT ALL PRIVILEGES ON *.* TO '{{ DB_USER }}'@'%' WITH GRANT OPTION;
-        FLUSH PRIVILEGES;
-        EOF
+        echo ">>> Using DB_NAME='{{ DB_NAME }}', DB_USER='{{ DB_USER }}'"
 
-        mysql -u root -e "CREATE DATABASE IF NOT EXISTS {{ DB_NAME }};"
+        echo ">>> Creating remote user {{ DB_USER }}"
+        mysql <<EOF
+CREATE USER IF NOT EXISTS '{{ DB_USER }}'@'%' IDENTIFIED BY '{{ DB_PASS }}';
+GRANT ALL PRIVILEGES ON *.* TO '{{ DB_USER }}'@'%' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+EOF
 
+        echo ">>> Creating database {{ DB_NAME }}"
+        mysql -u root -e "CREATE DATABASE IF NOT EXISTS \`{{ DB_NAME }}\`;"
+
+        echo ">>> Clone or update movie-analyst-api repo"
         cd /home/ubuntu
         if [ ! -d movie-analyst-api ]; then
           git clone https://github.com/joanroamora/movie-analyst-api.git
@@ -70,7 +98,8 @@
           cd movie-analyst-api && git pull
         fi
 
-        mysql -u root {{ DB_NAME }} < /home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql
+        echo ">>> Importing SQL into {{ DB_NAME }}"
+        mysql -u root "{{ DB_NAME }}" < /home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql
       args:
         executable: /bin/bash
 
