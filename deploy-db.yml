@@ -14,13 +14,32 @@
     # -------------------------------------------------------------------------
     # Prevent dpkg lock
     # -------------------------------------------------------------------------
-    - name: Wait for dpkg lock
+    - name: Wait for dpkg lock (with 10-minute heartbeat)
       shell: |
-        while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-          echo "Waiting for dpkg lock..."
+        echo "Waiting for dpkg/apt locks..."
+        start=$(date +%s)
+    
+        while sudo lsof /var/lib/dpkg/lock >/dev/null 2>&1 \
+           || sudo lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+           || sudo lsof /var/lib/apt/lists/lock >/dev/null 2>&1 \
+           || sudo lsof /var/cache/apt/archives/lock >/dev/null 2>&1; do
+          
+          now=$(date +%s)
+          elapsed=$(( now - start ))
+    
+          echo "Still locked... elapsed ${elapsed}s"
           sleep 5
+    
+          # TIMEOUT preventivo: 600s = 10 minutos
+          if [ $elapsed -gt 600 ]; then
+            echo "ERROR: dpkg lock timeout (10 minutes) — aborting."
+            exit 1
+          fi
         done
+    
+        echo "dpkg/apt lock released."
       changed_when: false
+
 
     # -------------------------------------------------------------------------
     # System update
