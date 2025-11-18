@@ -87,6 +87,23 @@
         executable: pip3
 
     # -------------------------------------------------------------------------
+    # Fix root authentication (Ubuntu uses auth_socket by default)
+    # -------------------------------------------------------------------------
+    - name: Set MySQL root password & change root plugin
+      shell: |
+        sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'rootpass'; FLUSH PRIVILEGES;"
+      args:
+        warn: false
+      changed_when: false
+
+    - name: Ensure root password works
+      mysql_info:
+        login_user: root
+        login_password: rootpass
+      register: root_auth
+      failed_when: root_auth.failed
+
+    # -------------------------------------------------------------------------
     # Create application user
     # -------------------------------------------------------------------------
     - name: Create application DB user
@@ -96,6 +113,9 @@
         host: "%"
         priv: "*.*:ALL"
         state: present
+        login_user: root
+        login_password: rootpass
+        login_host: localhost
 
     # -------------------------------------------------------------------------
     # Create main database
@@ -104,6 +124,9 @@
       mysql_db:
         name: "{{ DB_NAME }}"
         state: present
+        login_user: root
+        login_password: rootpass
+        login_host: localhost
 
     # -------------------------------------------------------------------------
     # Clone repo to access SQL file
