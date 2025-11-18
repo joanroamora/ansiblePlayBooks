@@ -107,6 +107,7 @@
     # -------------------------------------------------------------------------
     # Create application user
     # -------------------------------------------------------------------------
+
     - name: Create application DB user
       mysql_user:
         name: "{{ DB_USER }}"
@@ -116,18 +117,16 @@
         state: present
         login_user: root
         login_password: rootpass
-        login_host: localhost
 
     # -------------------------------------------------------------------------
     # Create main database
     # -------------------------------------------------------------------------
-    - name: Create movie_db database
+    - name: Create database
       mysql_db:
         name: "{{ DB_NAME }}"
         state: present
         login_user: root
         login_password: rootpass
-        login_host: localhost
 
     # -------------------------------------------------------------------------
     # Clone repo to access SQL file
@@ -141,14 +140,14 @@
     # -------------------------------------------------------------------------
     # Import SQL schema + inserts
     # -------------------------------------------------------------------------
-    - name: Load SQL schema & inserts
+
+    - name: Load SQL schema
       mysql_db:
         state: import
         name: "{{ DB_NAME }}"
         target: "/home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql"
-        login_user: "{{ DB_USER }}"
-        login_password: "{{ DB_PASS }}"
-        login_host: "127.0.0.1"
+        login_user: root
+        login_password: rootpass
 
   handlers:
     - name: Restart mysql
