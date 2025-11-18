@@ -53,18 +53,22 @@
     - name: Bootstrap DB using user-data logic
       shell: |
         set -e
+
         mysql << 'EOF'
 CREATE USER IF NOT EXISTS '{{ DB_USER }}'@'%' IDENTIFIED BY '{{ DB_PASS }}';
 GRANT ALL PRIVILEGES ON *.* TO '{{ DB_USER }}'@'%' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 EOF
+
         mysql -u root -e "CREATE DATABASE IF NOT EXISTS {{ DB_NAME }};"
+
         cd /home/ubuntu
         if [ ! -d movie-analyst-api ]; then
           git clone https://github.com/joanroamora/movie-analyst-api.git
         else
           cd movie-analyst-api && git pull
         fi
+
         mysql -u root {{ DB_NAME }} < /home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql
       args:
         executable: /bin/bash
