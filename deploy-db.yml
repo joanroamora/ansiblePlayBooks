@@ -4,36 +4,27 @@
 
   vars:
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
-
     DB_NAME: "{{ db_name | default('movie_db') }}"
     DB_USER: "{{ db_user | default('usuario') }}"
     DB_PASS: "{{ db_pass | default('usuario') }}"
 
   tasks:
-
     - name: Wait for dpkg lock (10 min timeout)
       shell: |
         echo "Waiting for dpkg/apt locks..."
         start=$(date +%s)
-
         while sudo lsof /var/lib/dpkg/lock >/dev/null 2>&1 \
            || sudo lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
            || sudo lsof /var/lib/apt/lists/lock >/dev/null 2>&1 \
            || sudo lsof /var/cache/apt/archives/lock >/dev/null 2>&1; do
-
           now=$(date +%s)
           elapsed=$(( now - start ))
-
           echo "Still locked... elapsed ${elapsed}s"
           sleep 5
-
           if [ $elapsed -gt 600 ]; then
-            echo "ERROR: dpkg lock timeout (10 minutes) — aborting."
-            exit 1
+            echo "ERROR: dpkg lock timeout"; exit 1
           fi
         done
-
-        echo "dpkg/apt lock released."
       changed_when: false
 
     - name: Update apt packages
@@ -59,33 +50,24 @@
         line: 'bind-address = 0.0.0.0'
       notify: Restart mysql
 
-
-        - name: Bootstrap DB using user-data logic
-          shell: |
-            set -e
-    
-            echo ">>> Creating user {{ DB_USER }}"
-            mysql << 'EOF'
-    CREATE USER IF NOT EXISTS '{{ DB_USER }}'@'%' IDENTIFIED BY '{{ DB_PASS }}';
-    GRANT ALL PRIVILEGES ON *.* TO '{{ DB_USER }}'@'%' WITH GRANT OPTION;
-    FLUSH PRIVILEGES;
-    EOF
-    
-            echo ">>> Creating database {{ DB_NAME }}"
-            mysql -u root -e "CREATE DATABASE IF NOT EXISTS {{ DB_NAME }};"
-    
-            echo ">>> Clone repo"
-            cd /home/ubuntu
-            if [ ! -d /home/ubuntu/movie-analyst-api ]; then
-              git clone https://github.com/joanroamora/movie-analyst-api.git
-            else
-              cd /home/ubuntu/movie-analyst-api && git pull
-            fi
-    
-            echo ">>> Importing SQL"
-            mysql -u root {{ DB_NAME }} < /home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql
-          args:
-            executable: /bin/bash
+    - name: Bootstrap DB using user-data logic
+      shell: |
+        set -e
+        mysql << 'EOF'
+CREATE USER IF NOT EXISTS '{{ DB_USER }}'@'%' IDENTIFIED BY '{{ DB_PASS }}';
+GRANT ALL PRIVILEGES ON *.* TO '{{ DB_USER }}'@'%' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+EOF
+        mysql -u root -e "CREATE DATABASE IF NOT EXISTS {{ DB_NAME }};"
+        cd /home/ubuntu
+        if [ ! -d movie-analyst-api ]; then
+          git clone https://github.com/joanroamora/movie-analyst-api.git
+        else
+          cd movie-analyst-api && git pull
+        fi
+        mysql -u root {{ DB_NAME }} < /home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql
+      args:
+        executable: /bin/bash
 
   handlers:
     - name: Restart mysql
