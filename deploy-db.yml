@@ -1,0 +1,98 @@
+- name: Database Bootstrap (MySQL Server Setup)
+  hosts: db
+  become: yes
+
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    DB_NAME: "{{ db_name | default('movie_db') }}"
+    DB_USER: "{{ db_user | default('usuario') }}"
+    DB_PASS: "{{ db_pass | default('usuario') }}"
+
+  tasks:
+
+    # -------------------------------------------------------------------------
+    # Prevent dpkg lock
+    # -------------------------------------------------------------------------
+    - name: Wait for dpkg lock
+      shell: |
+        while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          echo "Waiting for dpkg lock..."
+          sleep 5
+        done
+      changed_when: false
+
+    # -------------------------------------------------------------------------
+    # System update
+    # -------------------------------------------------------------------------
+    - name: Update apt packages
+      apt:
+        update_cache: yes
+        upgrade: yes
+
+    # -------------------------------------------------------------------------
+    # Install MySQL
+    # -------------------------------------------------------------------------
+    - name: Install MySQL Server
+      apt:
+        name: mysql-server
+        state: present
+
+    - name: Ensure MySQL running and enabled
+      systemd:
+        name: mysql
+        state: started
+        enabled: yes
+
+    # -------------------------------------------------------------------------
+    # Allow remote access
+    # -------------------------------------------------------------------------
+    - name: Allow external connections
+      lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: '^bind-address'
+        line: 'bind-address = 0.0.0.0'
+      notify: Restart mysql
+
+    # -------------------------------------------------------------------------
+    # Create DB user
+    # -------------------------------------------------------------------------
+    - name: Create database user
+      mysql_user:
+        name: "{{ DB_USER }}"
+        password: "{{ DB_PASS }}"
+        host: "%"
+        priv: "*.*:ALL"
+        state: present
+
+    # -------------------------------------------------------------------------
+    # Create database
+    # -------------------------------------------------------------------------
+    - name: Create database
+      mysql_db:
+        name: "{{ DB_NAME }}"
+        state: present
+
+    # -------------------------------------------------------------------------
+    # Clone API repo to get SQL file
+    # -------------------------------------------------------------------------
+    - name: Clone API repo for SQL files
+      git:
+        repo: "https://github.com/joanroamora/movie-analyst-api.git"
+        dest: /home/ubuntu/movie-analyst-api
+        version: main
+
+    # -------------------------------------------------------------------------
+    # Load SQL schema
+    # -------------------------------------------------------------------------
+    - name: Load initial SQL schema & inserts
+      mysql_db:
+        state: import
+        name: "{{ DB_NAME }}"
+        target: "/home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql"
+
+  handlers:
+    - name: Restart mysql
+      systemd:
+        name: mysql
+        state: restarted
