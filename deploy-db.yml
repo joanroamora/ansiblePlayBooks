@@ -91,10 +91,11 @@
     # -------------------------------------------------------------------------
     - name: Set MySQL root password & change root plugin
       shell: |
-        sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'rootpass'; FLUSH PRIVILEGES;"
+        mysql --user=root --execute "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'rootpass';"
+        mysql --user=root --execute "FLUSH PRIVILEGES;"
       args:
-        warn: false
-      changed_when: false
+        executable: /bin/bash
+      ignore_errors: false
 
     - name: Ensure root password works
       mysql_info:
