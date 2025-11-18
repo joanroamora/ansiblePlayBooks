@@ -5,12 +5,12 @@
   vars:
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
 
-    # Variables externas desde GitHub Actions
     DB_NAME: "{{ db_name | default('movie_db') }}"
     DB_USER: "{{ db_user | default('usuario') }}"
     DB_PASS: "{{ db_pass | default('usuario') }}"
 
   tasks:
+
     # -------------------------------------------------------------------------
     # Prevent dpkg lock
     # -------------------------------------------------------------------------
@@ -48,7 +48,7 @@
         upgrade: yes
 
     # -------------------------------------------------------------------------
-    # Install MySQL Server
+    # MySQL installation
     # -------------------------------------------------------------------------
     - name: Install MySQL Server
       apt:
@@ -72,84 +72,34 @@
       notify: Restart mysql
 
     # -------------------------------------------------------------------------
-    # Python dependencies for Ansible mysql modules
+    # Bootstrap database using original user-data logic
     # -------------------------------------------------------------------------
-    - name: Install Python MySQL deps (pip)
-      apt:
-        name:
-          - python3-pip
-        state: present
-        update_cache: yes
-
-    - name: Install PyMySQL
-      pip:
-        name: PyMySQL
-        executable: pip3
-
-    # -------------------------------------------------------------------------
-    # Fix root authentication (Ubuntu uses auth_socket by default)
-    # -------------------------------------------------------------------------
-
-    - name: Create admin superuser (recommended instead of modifying root)
+    - name: Bootstrap DB (users + schema) — same behavior as old user-data script
       shell: |
-        sudo mysql -e "CREATE USER IF NOT EXISTS 'admin_app'@'%' IDENTIFIED BY 'adminpass';"
-        sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'admin_app'@'%' WITH GRANT OPTION;"
-        sudo mysql -e "FLUSH PRIVILEGES;"
+        set -e
+
+        echo ">>> Creating remote user {{ DB_USER }}"
+        mysql <<EOF
+CREATE USER IF NOT EXISTS '{{ DB_USER }}'@'%' IDENTIFIED BY '{{ DB_PASS }}';
+GRANT ALL PRIVILEGES ON *.* TO '{{ DB_USER }}'@'%' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+EOF
+
+        echo ">>> Creating database {{ DB_NAME }}"
+        mysql -u root -e "CREATE DATABASE IF NOT EXISTS {{ DB_NAME }};"
+
+        echo ">>> Clone repo (SQL schema)"
+        cd /home/ubuntu
+        if [ ! -d /home/ubuntu/movie-analyst-api ]; then
+          git clone https://github.com/joanroamora/movie-analyst-api.git
+        else
+          cd /home/ubuntu/movie-analyst-api && git pull
+        fi
+
+        echo ">>> Importing SQL into {{ DB_NAME }}"
+        mysql -u root {{ DB_NAME }} < /home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql
       args:
         executable: /bin/bash
-
-    - name: Ensure root password works
-      mysql_info:
-        login_user: root
-        login_password: rootpass
-      register: root_auth
-      failed_when: root_auth.failed
-
-    # -------------------------------------------------------------------------
-    # Create application user
-    # -------------------------------------------------------------------------
-
-    - name: Create application DB user
-      mysql_user:
-        name: "{{ DB_USER }}"
-        password: "{{ DB_PASS }}"
-        host: "%"
-        priv: "*.*:ALL"
-        state: present
-        login_user: admin_app
-        login_password: adminpass
-
-    # -------------------------------------------------------------------------
-    # Create main database
-    # -------------------------------------------------------------------------
-
-    - name: Create database
-      mysql_db:
-        name: "{{ DB_NAME }}"
-        state: present
-        login_user: admin_app
-        login_password: adminpass
-
-    # -------------------------------------------------------------------------
-    # Clone repo to access SQL file
-    # -------------------------------------------------------------------------
-    - name: Clone API repo (SQL schema)
-      git:
-        repo: "https://github.com/joanroamora/movie-analyst-api.git"
-        dest: /home/ubuntu/movie-analyst-api
-        version: main
-
-    # -------------------------------------------------------------------------
-    # Import SQL schema + inserts
-    # -------------------------------------------------------------------------
-
-    - name: Load SQL schema
-      mysql_db:
-        state: import
-        name: "{{ DB_NAME }}"
-        target: "/home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql"
-        login_user: admin_app
-        login_password: adminpass
 
   handlers:
     - name: Restart mysql
