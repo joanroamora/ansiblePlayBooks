@@ -72,7 +72,7 @@
       notify: Restart mysql
 
     # -------------------------------------------------------------------------
-    # Bootstrap DB usando la lógica original del user-data
+    # Bootstrap DB usando la lógica original del user-data (idempotente)
     # -------------------------------------------------------------------------
     - name: Bootstrap DB using user-data logic
       shell: |
@@ -98,8 +98,13 @@
           cd movie-analyst-api && git pull
         fi
 
-        echo ">>> Importing SQL into {{ DB_NAME }}"
-        mysql -u root "{{ DB_NAME }}" < /home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql
+        echo ">>> Checking if schema already imported into {{ DB_NAME }}"
+        if mysql -u root -D "{{ DB_NAME }}" -e "SHOW TABLES LIKE 'publication';" | grep -q publication; then
+          echo ">>> Schema already present, skipping import"
+        else
+          echo ">>> Importing SQL into {{ DB_NAME }}"
+          mysql -u root "{{ DB_NAME }}" < /home/ubuntu/movie-analyst-api/data_model/table_creation_and_inserts.sql
+        fi
       args:
         executable: /bin/bash
 
