@@ -1,0 +1,4 @@
+app_env: prod
+
+# variables genéricas por si las quieres usar en los playbooks
+node_app_port: 3000
