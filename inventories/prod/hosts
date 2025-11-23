@@ -1,0 +1,11 @@
+[frontend]
+# IP privada o interna del frontend de PROD (la sobreescribirá el pipeline)
+10.0.0.11 ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/terraform.pem
+
+[backend]
+# IP privada o interna del backend de PROD
+10.0.0.12 ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/terraform.pem
+
+[db]
+# IP privada o interna de la DB de PROD
+10.0.0.13 ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/terraform.pem
