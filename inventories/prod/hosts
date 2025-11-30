@@ -9,3 +9,7 @@
 [db]
 # IP privada o interna de la DB de PROD
 10.0.0.13 ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/terraform.pem
+
+[observability]
+OBS_PUBLIC_IP
+
