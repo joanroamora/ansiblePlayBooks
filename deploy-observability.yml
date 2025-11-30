@@ -1,0 +1,84 @@
+- name: Deploy Observability Stack (Grafana, Prometheus, Loki, Promtail, Jaeger)
+  hosts: observability
+  become: yes
+
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+    obs_dir: /opt/observability
+
+  tasks:
+
+    # ========================================
+    # Install Docker
+    # ========================================
+    - name: Ensure Docker installed
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    # ========================================
+    # Install Docker Compose (plugin)
+    # ========================================
+    - name: Install docker-compose plugin
+      get_url:
+        url: https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: "0755"
+
+    # ========================================
+    # Create deployment directory
+    # ========================================
+    - name: Ensure observability directory exists
+      file:
+        path: "{{ obs_dir }}"
+        state: directory
+        mode: "0755"
+
+    # ========================================
+    # Copy configuration files
+    # ========================================
+    - name: Copy docker-compose
+      copy:
+        src: ./files/docker-compose-observability.yml
+        dest: "{{ obs_dir }}/docker-compose.yml"
+        mode: "0644"
+
+    - name: Copy Prometheus config
+      copy:
+        src: ./files/prometheus.yml
+        dest: "{{ obs_dir }}/prometheus.yml"
+        mode: "0644"
+
+    - name: Copy Promtail config
+      copy:
+        src: ./files/promtail-config.yml
+        dest: "{{ obs_dir }}/promtail-config.yml"
+        mode: "0644"
+
+    # ========================================
+    # Bring up services
+    # ========================================
+    - name: Deploy Observability Stack
+      command: docker-compose up -d
+      args:
+        chdir: "{{ obs_dir }}"
+
+    # ========================================
+    # Diagnostics
+    # ========================================
+    - name: Show running containers
+      command: docker ps -a
+      ignore_errors: yes
