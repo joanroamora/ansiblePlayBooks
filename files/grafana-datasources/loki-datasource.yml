@@ -3,6 +3,5 @@ datasources:
   - name: Loki
     type: loki
     uid: loki-ds
-    access: proxy
     url: http://loki:3100
-    editable: true
+    access: proxy
