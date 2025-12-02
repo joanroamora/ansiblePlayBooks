@@ -9,6 +9,7 @@
     DB_USER: "{{ db_user | default('usuario') }}"
     DB_PASS: "{{ db_pass | default('usuario') }}"
     DB_NAME: "{{ db_name | default('movie_db') }}"
+    JAEGER_IP: "{{ jaeger_ip }}"
 
   tasks:
 
