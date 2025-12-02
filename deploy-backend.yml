@@ -125,6 +125,7 @@
         -e JAEGER_IP={{ JAEGER_IP }} \
         {{ APP_IMAGE }}
 
+
     # --- Diagnostics -----------------------------------------------------------
     - name: Show containers
       command: docker ps -a
