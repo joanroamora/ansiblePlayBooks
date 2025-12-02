@@ -118,9 +118,10 @@
 
     - name: Run backend container
       command: >
-        docker run -d --name backend --restart=always
-        -p 3000:3000
-        --env-file /etc/movie-analyst/.env
+        docker run -d --name backend --restart=always \
+        -p 3000:3000 \
+        --env-file /etc/movie-analyst/.env \
+        -e JAEGER_IP={{ JAEGER_IP }} \
         {{ APP_IMAGE }}
 
     # --- Diagnostics -----------------------------------------------------------
