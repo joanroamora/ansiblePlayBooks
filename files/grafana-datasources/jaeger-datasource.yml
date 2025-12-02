@@ -1,12 +1,16 @@
-grafana:
-  image: grafana/grafana:latest
-  container_name: grafana
-  ports:
-    - "3000:3000"
-  environment:
-    GF_SECURITY_ADMIN_USER: admin
-    GF_SECURITY_ADMIN_PASSWORD: admin
-  volumes:
-    - grafana-data:/var/lib/grafana
-    - ./grafana-datasources:/etc/grafana/provisioning/datasources
-  restart: always
+# jaeger-datasource.yml
+apiVersion: 1
+datasources:
+  - name: Jaeger
+    type: "jaeger"
+    uid: "jaeger-ds"
+    access: proxy
+    url: "http://jaeger:16686"
+    jsonData:
+      tracesToLogs:
+        datasourceUid: 'loki-ds'
+      tracesToMetrics:
+        datasourceUid: 'prometheus-ds'
+      serviceMap:
+        datasourceUid: 'prometheus-ds'
+    editable: true
