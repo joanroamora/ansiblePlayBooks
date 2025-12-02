@@ -47,6 +47,12 @@
         state: directory
         mode: "0755"
 
+    - name: Copy Grafana datasources directory
+      copy:
+        src: ./files/grafana-datasources/
+        dest: "{{ obs_dir }}/grafana-datasources/"
+        mode: "0755"
+
     # ========================================
     # Copy configuration files
     # ========================================
