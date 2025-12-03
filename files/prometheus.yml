@@ -3,6 +3,9 @@ datasources:
   - name: Prometheus
     type: prometheus
     uid: prometheus-ds
-    url: http://prometheus:9090
     access: proxy
+    url: http://prometheus:9090
     isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: GET
