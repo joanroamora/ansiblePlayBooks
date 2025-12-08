@@ -78,7 +78,7 @@
       copy:
         dest: "{{ obs_dir }}/.env"
         content: |
-          BACKEND_IP={{ hostvars['backend']['ansible_host'] }}
+          BACKEND_IP={{ backend_ip }}
 
     # ========================================
     # Bring up services
