@@ -7,11 +7,16 @@ services:
     container_name: prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    env_file:
+      - .env
+    environment:
+      - BACKEND_IP=${BACKEND_IP}
     ports:
       - "9090:9090"
     networks:
       - observability
     restart: always
+
 
   grafana:
     image: grafana/grafana:latest
