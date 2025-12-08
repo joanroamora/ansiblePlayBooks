@@ -74,6 +74,12 @@
         dest: "{{ obs_dir }}/promtail-config.yml"
         mode: "0644"
 
+    - name: Create environment file for Prometheus
+      copy:
+        dest: "{{ obs_dir }}/.env"
+        content: |
+          BACKEND_IP={{ hostvars['backend']['ansible_host'] }}
+
     # ========================================
     # Bring up services
     # ========================================
