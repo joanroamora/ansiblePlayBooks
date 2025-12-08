@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
 
-  prometheus:
+    prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
@@ -16,7 +16,6 @@ services:
     networks:
       - observability
     restart: always
-
 
   grafana:
     image: grafana/grafana:latest
