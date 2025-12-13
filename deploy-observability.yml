@@ -53,6 +53,26 @@
         dest: "{{ obs_dir }}/grafana-datasources/"
         mode: "0755"
 
+    # ... (después de copiar grafana-datasources)
+
+    - name: Ensure Grafana dashboard directories exist
+      file:
+        path: "{{ obs_dir }}/grafana-dashboards"
+        state: directory
+        mode: "0755"
+
+    - name: Copy Dashboard JSONs
+      copy:
+        src: ./files/grafana-dashboards/
+        dest: "{{ obs_dir }}/grafana-dashboards/"
+        mode: "0644"
+
+    - name: Copy Dashboard Provisioning Config
+      copy:
+        src: ./files/grafana-provisioning/dashboards.yml
+        dest: "{{ obs_dir }}/grafana-provisioning.yml"
+        mode: "0644"
+
     # ========================================
     # Copy configuration files
     # ========================================
