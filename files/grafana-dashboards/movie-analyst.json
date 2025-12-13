@@ -179,7 +179,7 @@
             "type": "prometheus",
             "uid": "prometheus-ds"
           },
-          "expr": "sum(rate(http_request_duration_seconds_count{job=\"backend\", code=~\"5..\"}[5m])) / sum(rate(http_request_duration_seconds_count{job=\"backend\"}[5m])) * 100",
+          "expr": "sum(rate(http_request_duration_seconds_count{job=\"backend\", status_code=~\"5..\"}[5m])) / sum(rate(http_request_duration_seconds_count{job=\"backend\"}[5m])) * 100",
           "legendFormat": "Error Rate",
           "refId": "A"
         }
