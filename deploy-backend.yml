@@ -10,6 +10,8 @@
     DB_PASS: "{{ db_pass | default('usuario') }}"
     DB_NAME: "{{ db_name | default('movie_db') }}"
     JAEGER_IP: "{{ jaeger_ip }}"
+    # Usamos la variable del inventario (ej: prod) o 'development' por defecto
+    RUNTIME_ENV: "{{ app_env | default('development') }}" 
 
   tasks:
 
@@ -105,7 +107,7 @@
         line: "DB_HOST={{ DB_HOST }}"
         state: present
 
-    # --- Pull & Run Backend Container -----------------------------------------
+    # --- Pull & Run Backend Container (CORREGIDO) -----------------------------------------
     - name: Stop existing backend container
       command: docker stop backend
       ignore_errors: yes
@@ -117,35 +119,14 @@
     - name: Pull latest backend image
       command: docker pull {{ APP_IMAGE }}
 
-    - name: Run backend container
+    - name: Run backend container (with dynamic env vars and METRICS_ENABLED flag)
       command: >
         docker run -d --name backend --restart=always \
         -p 3000:3000 \
         --env-file /etc/movie-analyst/.env \
+        -e NODE_ENV={{ RUNTIME_ENV }} \         # Usa la variable del entorno (prod, staging, etc.)
         -e JAEGER_IP={{ JAEGER_IP }} \
-        {{ APP_IMAGE }}
-
-    - name: Run backend container
-      command: >
-        docker run -d --name backend --restart=always \
-        -p 3000:3000 \
-        --env-file /etc/movie-analyst/.env \
-        -e NODE_ENV=production \    # <--- AÑADIDO: Asegura comportamiento de Prod.
-        -e JAEGER_IP={{ JAEGER_IP }} \
-        -e METRICS_ENABLED=true \   # <--- AÑADIDO: Forzar activación de métricas.
-        {{ APP_IMAGE }}
-
-    # --- Pull & Run Backend Container -----------------------------------------
-    # ... (tareas stop/rm/pull sin cambios)
-
-    - name: Run backend container
-      command: >
-        docker run -d --name backend --restart=always \
-        -p 3000:3000 \
-        --env-file /etc/movie-analyst/.env \
-        -e NODE_ENV={{ app_env | default('development') }} \ # <--- Usa la variable del entorno
-        -e JAEGER_IP={{ JAEGER_IP }} \
-        -e METRICS_ENABLED=true \ # <--- FUERZA la activación de métricas en cualquier entorno
+        -e METRICS_ENABLED=true \               # FUERZA la activación del endpoint /metrics
         {{ APP_IMAGE }}
 
 
