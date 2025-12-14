@@ -6,12 +6,14 @@
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
     APP_IMAGE: "{{ app_image }}"
     DB_HOST: "{{ db_host }}"
-    DB_USER: "{{ db_user | default('usuario') }}"
-    DB_PASS: "{{ db_pass | default('usuario') }}"
-    DB_NAME: "{{ db_name | default('movie_db') }}"
+    # CORRECCIÓN: Usamos 'default(..., true)' para que se active si la variable es vacía
+    # Esto blinda el playbook contra el error de tu workflow de Prod
+    DB_USER: "{{ db_user | default('usuario', true) }}" 
+    DB_PASS: "{{ db_pass | default('usuario', true) }}"
+    DB_NAME: "{{ db_name | default('movie_db', true) }}"
     JAEGER_IP: "{{ jaeger_ip }}"
-    # Usamos la variable del inventario (ej: prod) o 'development' por defecto
-    RUNTIME_ENV: "{{ app_env | default('development') }}" 
+    # También corregimos esto para que detecte Prod correctamente
+    RUNTIME_ENV: "{{ app_env | default('development', true) }}"
 
   tasks:
 
