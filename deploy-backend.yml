@@ -128,9 +128,9 @@
         --env-file /etc/movie-analyst/.env \
         -e NODE_ENV={{ RUNTIME_ENV }} \
         -e JAEGER_IP={{ JAEGER_IP }} \
-        -e OTEL_EXPORTER_PROMETHEUS_ENDPOINT=/metrics \ # <--- CORRECCIÓN CLAVE
+        -e OTEL_EXPORTER_PROMETHEUS_ENDPOINT=/metrics \
         {{ APP_IMAGE }}
-
+        
     # --- Diagnostics -----------------------------------------------------------
     - name: Show containers
       command: docker ps -a
